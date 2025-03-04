@@ -40,9 +40,12 @@ Below scripts are located under `zoedepth/`
     - `base_trainer`:
         - Need adjustments to `wandb`, however `WANDB_MODE=disabled` is use during training.
         - Line of code to use CPU if no GPU is available.
+        - changed `settings=wandb.Settings(start_method="thread")` set to `thread` used to be `fork` (doesn't matter since wandb is disabled)
 
     - `zoedepth_trainer`: Commented out code relavent to `masks` and/or set `masks=None`.
 
 ## Utils
 - Scripts modified:
-    - `config`: Adjusted the path for `diode_outdoor` dataset.
+    - `config`: 
+        - Adjusted the path for `diode_outdoor` dataset.
+        - set `"multigpu": False,` under `diode_outdoor`
