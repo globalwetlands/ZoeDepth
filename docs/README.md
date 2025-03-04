@@ -17,7 +17,11 @@ Data directories:
 `WANDB_MODE=disabled python3 train_mono.py -d diode_outdoor -m zoedepth`
 
 # Modifications
-scripts are located under `zoedepth/`
+
+## train_mono.py:
+- `train_mono.py` in base directory: Line of code for device to use CPU if no GPU is available.
+
+Below scripts are located under `zoedepth/`
 
 ## data
 - Scripts modified: 
@@ -33,7 +37,10 @@ scripts are located under `zoedepth/`
 
 ## Trainers           
 - Scripts modified:
-    - `base_trainer`: Need adjustements to `wandb`, however `WANDB_MODE=disabled` is use during training.
+    - `base_trainer`:
+        - Need adjustments to `wandb`, however `WANDB_MODE=disabled` is use during training.
+        - Line of code to use CPU if no GPU is available.
+
     - `zoedepth_trainer`: Commented out code relavent to `masks` and/or set `masks=None`.
 
 ## Utils
