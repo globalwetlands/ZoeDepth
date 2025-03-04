@@ -177,7 +177,7 @@ DATASETS_CONFIG = {
     },
     "diode_outdoor": {
         "dataset": "diode_outdoor",
-        "diode_outdoor_root": "/home/shakyafernando/projects/ZoeDepth/data/ground-truths/tnc",  # Added path
+        "diode_outdoor_root": "/home/shakyafernando/projects/ZoeDepth/data/ground-truths/tnc",
         "multigpu": False,
         "garg_crop": True,
         "do_kb_crop": False,
@@ -345,15 +345,7 @@ def get_config(model_name, mode="train", dataset=None, **overwrite_kwargs):
     check_choices("Mode", mode, ["train", "infer", "eval"])
     if mode == "train":
         check_choices(
-            "Dataset",
-            dataset,
-            [
-                "nyu",
-                "kitti",
-                "mix",
-                "diode_outdoor",
-                None,
-            ],  # Added diode_outdoor to check_choices
+            "Dataset", dataset, ["nyu", "kitti", "mix", "diode_outdoor", None]
         )
 
     config = flatten({**COMMON_CONFIG, **COMMON_TRAINING_CONFIG})
