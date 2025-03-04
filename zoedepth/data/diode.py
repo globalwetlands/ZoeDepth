@@ -1,29 +1,5 @@
-# MIT License
-
-# Copyright (c) 2022 Intelligent Systems Lab Org
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-# File author: Shariq Farooq Bhat
-
 import os
-
+import glob
 import numpy as np
 import torch
 from PIL import Image
@@ -33,80 +9,80 @@ from torchvision import transforms
 
 class ToTensor(object):
     def __init__(self):
-        # self.normalize = transforms.Normalize(
-        #     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        self.normalize = lambda x : x
-        self.resize = transforms.Resize(480)
+        # Use a named identity function instead of a lambda
+        self.normalize = self.identity
+        # Resize the image to a fixed resolution (480 x 640)
+        self.resize = transforms.Resize((480, 640))
+
+        self.transform_image = transforms.Compose(
+            [
+                transforms.ToTensor(),  # Converts PIL Image to (C, H, W) tensor in range [0,1]
+                self.normalize,
+            ]
+        )
+        # ToTensor converts a 2D numpy array to a tensor of shape (1, H, W)
+        self.transform_depth = transforms.ToTensor()
 
     def __call__(self, sample):
-        image, depth = sample['image'], sample['depth']
-        image = self.to_tensor(image)
-        image = self.normalize(image)
-        depth = self.to_tensor(depth)
-
+        image, depth = sample["image"], sample["depth"]
+        image = self.transform_image(image)
+        depth = self.transform_depth(depth)
+        # Resize image; depth is left at its original resolution.
         image = self.resize(image)
 
-        return {'image': image, 'depth': depth, 'dataset': "diode"}
+        depth = self.resize(depth)
+        return {"image": image, "depth": depth, "dataset": "diode_outdoor"}
 
-    def to_tensor(self, pic):
-
-        if isinstance(pic, np.ndarray):
-            img = torch.from_numpy(pic.transpose((2, 0, 1)))
-            return img
-
-        #         # handle PIL Image
-        if pic.mode == 'I':
-            img = torch.from_numpy(np.array(pic, np.int32, copy=False))
-        elif pic.mode == 'I;16':
-            img = torch.from_numpy(np.array(pic, np.int16, copy=False))
-        else:
-            img = torch.ByteTensor(
-                torch.ByteStorage.from_buffer(pic.tobytes()))
-        # PIL image mode: 1, L, P, I, F, RGB, YCbCr, RGBA, CMYK
-        if pic.mode == 'YCbCr':
-            nchannel = 3
-        elif pic.mode == 'I;16':
-            nchannel = 1
-        else:
-            nchannel = len(pic.mode)
-        img = img.view(pic.size[1], pic.size[0], nchannel)
-
-        img = img.transpose(0, 1).transpose(0, 2).contiguous()
-
-        if isinstance(img, torch.ByteTensor):
-            return img.float()
-        else:
-            return img
+    def identity(self, x):
+        """A no-op normalization function."""
+        return x
 
 
 class DIODE(Dataset):
     def __init__(self, data_dir_root):
-        import glob
+        print(f"Loading dataset from: {data_dir_root}")
 
-        # image paths are of the form <data_dir_root>/scene_#/scan_#/*.png
+        # Retrieve image file paths.
         self.image_files = glob.glob(
-            os.path.join(data_dir_root, '*', '*', '*.png'))
-        self.depth_files = [r.replace(".png", "_depth.npy")
-                            for r in self.image_files]
-        self.depth_mask_files = [
-            r.replace(".png", "_depth_mask.npy") for r in self.image_files]
+            os.path.join(data_dir_root, "extracted-frames", "*.png")
+        )
+
+        # Generate corresponding depth map file paths.
+        self.depth_files = [
+            os.path.join(
+                data_dir_root,
+                "depth-maps-metric",
+                os.path.basename(img).replace(".png", "_depth.npy"),
+            )
+            for img in self.image_files
+        ]
+
+        # Ensure that depth maps exist for each image.
+        valid_pairs = []
+        for img, depth in zip(self.image_files, self.depth_files):
+            if os.path.exists(depth):
+                valid_pairs.append((img, depth))
+            else:
+                print(f"Warning: Missing depth map for {img}")
+        if valid_pairs:
+            self.image_files, self.depth_files = zip(*valid_pairs)
+        else:
+            self.image_files, self.depth_files = [], []
+        print(f"Found {len(self.image_files)} image-depth pairs.")
+
+        # No mask directory is used.
         self.transform = ToTensor()
 
     def __getitem__(self, idx):
         image_path = self.image_files[idx]
         depth_path = self.depth_files[idx]
-        depth_mask_path = self.depth_mask_files[idx]
 
-        image = np.asarray(Image.open(image_path), dtype=np.float32) / 255.0
-        depth = np.load(depth_path)  # in meters
-        valid = np.load(depth_mask_path)  # binary
+        # Load image and convert to RGB.
+        image = Image.open(image_path).convert("RGB")
+        # Load depth as a numpy array and convert to float32 (depth values in meters).
+        depth = np.load(depth_path).astype(np.float32)
 
-        # depth[depth > 8] = -1
-        # depth = depth[..., None]
-
-        sample = dict(image=image, depth=depth, valid=valid)
-
-        # return sample
+        sample = {"image": image, "depth": depth}
         sample = self.transform(sample)
 
         if idx == 0:
@@ -118,8 +94,21 @@ class DIODE(Dataset):
         return len(self.image_files)
 
 
-def get_diode_loader(data_dir_root, batch_size=1, **kwargs):
+def get_diode_loader(data_dir_root, batch_size=1, num_workers=0, **kwargs):
     dataset = DIODE(data_dir_root)
-    return DataLoader(dataset, batch_size, **kwargs)
+    return DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, **kwargs)
 
-# get_diode_loader(data_dir_root="datasets/diode/val/outdoor")
+
+# Test the data loader
+if __name__ == "__main__":
+    loader = get_diode_loader(
+        "/home/shakyafernando/projects/ZoeDepth/data/ground-truths/tnc",
+        batch_size=1,
+        # num_workers=2,
+    )
+
+    for batch in loader:
+        print("Loaded a batch")
+        print("Image shape:", batch["image"].shape)
+        print("Depth shape:", batch["depth"].shape)
+        break
