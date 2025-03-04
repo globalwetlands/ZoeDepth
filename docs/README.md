@@ -3,7 +3,9 @@ Data directories:
  - base: `data/ground-truths/tnc`
  - images/frames (PNG): `data/ground-truths/tnc/extracted-frames/`
  - depth-maps (.npy): `data/ground-truths/tnc/depth-maps-metric/`
- 
+
+ Data location:
+  - Located in (SharePoint)[https://griffitheduau.sharepoint.com/sites/glowstorage?e=1%3Ae5e828d3869f424b801530d23b597d99&CT=1709096554091&OR=OWA-NT&CID=f6317c35-7544-4bc6-45a4-465892c46794]
 # Training the model
 - Create virtual environment:
 `python -m venv env`
