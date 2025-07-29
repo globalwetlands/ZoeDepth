@@ -95,6 +95,10 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+.gitignore
+
+# Data
+data/
 
 # IPython
 profile_default/
