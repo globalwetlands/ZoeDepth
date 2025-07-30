@@ -101,10 +101,14 @@ class DepthDataLoader(object):
             )
             return
 
+        # if "diode" in config.dataset:
+        #     self.data = get_diode_loader(
+        #         config_path="config.yaml", batch_size=1, num_workers=1
+        #     )
+        #     return
+
         if "diode" in config.dataset:
-            self.data = get_diode_loader(
-                config[config.dataset + "_root"], batch_size=1, num_workers=1
-            )
+            self.data = get_diode_loader(batch_size=1, num_workers=1)
             return
 
         if config.dataset == "hypersim_test":
