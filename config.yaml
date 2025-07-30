@@ -1,0 +1,46 @@
+# DATASET CONFIG (DIODE)
+DATASET:
+  NAME: "diode_outdoor"                                           # DIODE OUTDOOR 
+
+# OS CONFIG
+OS_ENV: "WSL"                                                     # OPTIONS: "WSL", "MACOS", "LINUX", "WINDOWS", or "AUTO"
+  
+PLATFORMS:
+  WSL:
+    PREFIX: "/mnt/d"                                              # WLS
+  MACOS:
+    PREFIX: "/Volumes/Shak-bak"                                   # MACOS
+  LINUX:
+    PREFIX: "/home/shakyafernando"                                # LINUX
+  WINDOWS:
+    PREFIX: "D:\\"                                                # WINDWOS
+
+# DATA DIRECTORIES
+DIRECTORIES:
+  BASE_DIR: "project-monocular-data-prep/data/ground-truths/tnc"  # BASE DIR
+  IMAGES: "extracted-frames-20250617"                             # IMAGES DIR
+  DEPTH: "norm-depth-maps-20250729-deployment"                    # METRIC DEPTH MAPS DIR
+  MASKS: "binary-masks-20250729-deployment"                       # MASKS DIR
+
+# FILE EXTENSIONS
+FILES:
+  IMAGE_EXTENSION: ".png"                                         # IMGS
+  DEPTH_SUFFIX: "_depth.npy"                                      # METRIC DEPTH MAPS
+  MASK_SUFFIX: "_depth_mask.npy"                                  # MASKS
+
+# DEPLOYMENTS
+DEPLOYMENTS:
+  USE_ALL: false                                                  # OPTIONS: "true" or "false" 
+  SPECIFIC: ["deployment_16", "deployment_3019"]                  # USE SPECIFIC DEPLOYMENTS
+
+# DATA LOADING PARAMETERS
+DATALOADER:
+  BATCH_SIZE: 1
+  NUM_WORKERS: 0
+  SHUFFLE: false
+
+#  IMAGE PARAMETERS
+TRANSFORMS:
+  RESIZE:
+    HEIGHT: 480
+    WIDTH: 640
