@@ -26,9 +26,17 @@ import json
 import os
 import pathlib
 import platform
+import yaml
 
 from zoedepth.utils.easydict import EasyDict as edict
 from zoedepth.utils.arg_utils import infer_type
+
+def load_config(config_path="config.yaml"):
+    with open(config_path, 'r') as file:
+        return yaml.safe_load(file)
+
+# Load the config yaml
+config = load_config()
 
 ROOT = pathlib.Path(__file__).parent.parent.resolve()
 HOME_DIR = os.path.expanduser("~")
@@ -177,7 +185,7 @@ DATASETS_CONFIG = {
     },
     "diode_outdoor": {
         "dataset": "diode_outdoor",
-        "diode_outdoor_root": "/mnt/d/project-monocular-data-prep/data/ground-truths/tnc",
+        "diode_outdoor_root": os.path.join(config["PLATFORMS"]["WSL"]["PREFIX"], config["DIRECTORIES"]["BASE_DIR"]),
         "multigpu": False,
         "garg_crop": True,
         "do_kb_crop": False,
