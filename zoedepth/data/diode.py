@@ -1,14 +1,26 @@
 import os
 import glob
+import platform
 import numpy as np
+import yaml
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
 
+def load_config(config_path="config.yaml"):
+    """Load configuration from YAML file."""
+    with open(config_path, 'r') as file:
+        return yaml.safe_load(file)
+
+
 class ToTensor(object):
-    def __init__(self):
-        self.resize = transforms.Resize((480, 640))
+    def __init__(self, config):
+        self.config = config
+        resize_height = config["TRANSFORMS"]["RESIZE"]["HEIGHT"]
+        resize_width = config["TRANSFORMS"]["RESIZE"]["WIDTH"]
+        
+        self.resize = transforms.Resize((resize_height, resize_width))
         self.transform_image = transforms.Compose([transforms.ToTensor()])
         self.transform_depth = transforms.ToTensor()
         self.transform_valid = transforms.ToTensor()
@@ -25,45 +37,66 @@ class ToTensor(object):
         depth = self.resize(depth)
         valid = self.resize(valid)
         
-        return {"image": image, "depth": depth, "valid": valid, "mask": valid, "dataset": "diode_outdoor"}
+        return {
+            "image": image, 
+            "depth": depth, 
+            "valid": valid, 
+            "mask": valid, 
+            "dataset": self.config["DATASET"]["NAME"]
+        }
 
 
 class DIODE(Dataset):
-    def __init__(self, data_dir_root, deployments=None):
-        print(f"Initializing DIODE dataset from: {data_dir_root}")
-        self.data_dir_root = data_dir_root
+    def __init__(self, config):
+        self.config = config
+        # OS
+        os_env = config.get("OS_ENV", "WSL")  # Default to WSL
+        prefix = config["PLATFORMS"][os_env]["PREFIX"]
+        
+        # Base dir
+        self.data_dir_root = os.path.join(prefix, config["DIRECTORIES"]["BASE_DIR"])
+        
+        print(f"Initializing DIODE dataset from: {self.data_dir_root}")
         
         # Check if data directory exists
-        if not os.path.exists(data_dir_root):
-            raise ValueError(f"Data directory does not exist: {data_dir_root}")
+        if not os.path.exists(self.data_dir_root):
+            raise ValueError(f"Data directory does not exist: {self.data_dir_root}")
         
-        # Find available deployments
-        if deployments is None:
-            deployments = self._find_deployments()
+        # Find all available deployments
+        available_deployments = self._find_deployments()
         
-        if not deployments:
-            print(f"No deployment directories found in {data_dir_root}")
-            print(f"Directory contents: {os.listdir(data_dir_root) if os.path.exists(data_dir_root) else 'Directory does not exist'}")
-            raise ValueError(f"No deployment directories found in {data_dir_root}")
+        # Use deployments based on configuration
+        if config["DEPLOYMENTS"]["USE_ALL"]:
+            deployments = available_deployments
+            print(f"Using all available deployments: {len(deployments)} found")
+        else:
+            deployments = config["DEPLOYMENTS"]["SPECIFIC"]
+            print(f"Using specific deployments from config: {deployments}")
         
-        print(f"Found {len(deployments)} deployments: {deployments}")
+        # Validate deployments exist
+        valid_deployments = [d for d in deployments if d in available_deployments]
+        
+        if not valid_deployments:
+            raise ValueError(
+                f"None of the specified deployments {deployments} found. "
+                f"Available deployments: {available_deployments}"
+            )
+        
+        print(f"Valid deployments: {valid_deployments}")
         
         # Collect all valid file triplets
         print("Collecting file triplets...")
-        self.triplets = self._collect_file_triplets(deployments)
+        self.triplets = self._collect_file_triplets(valid_deployments)
         
         if not self.triplets:
-            print(f"Found deployments: {deployments}")
-            print("Checking directory structure...")
-            self._debug_directory_structure(deployments[:2])
-            raise ValueError(f"No valid image-depth-mask triplets found in {data_dir_root}")
+            raise ValueError(f"No valid image-depth-mask triplets found in {self.data_dir_root}")
         
         print(f"Successfully loaded {len(self.triplets)} samples")
-        self.transform = ToTensor()
+        self.transform = ToTensor(config)
 
     def _find_deployments(self):
         """Find all deployment directories."""
-        images_dir = os.path.join(self.data_dir_root, "extracted-frames-20250617")
+        images_dir = os.path.join(self.data_dir_root, self.config["DIRECTORIES"]["IMAGES"])
         deployments = []
         
         if os.path.exists(images_dir):
@@ -78,10 +111,14 @@ class DIODE(Dataset):
         triplets = []
         total_images = 0
         
+        dirs = self.config["DIRECTORIES"]
+        files = self.config["FILES"]
+        
         for deployment in deployments:
             # Get all images for this deployment
             image_pattern = os.path.join(
-                self.data_dir_root, "extracted-frames-20250617", deployment, "*.png"
+                self.data_dir_root, dirs["IMAGES"], deployment, 
+                f"*{files['IMAGE_EXTENSION']}"
             )
             images = glob.glob(image_pattern)
             total_images += len(images)
@@ -89,15 +126,16 @@ class DIODE(Dataset):
             valid_count = 0
             for img_path in images:
                 img_name = os.path.basename(img_path)
+                base_name = img_name.replace(files["IMAGE_EXTENSION"], "")
                 
                 # Generate corresponding depth and mask paths
                 depth_path = os.path.join(
-                    self.data_dir_root, "norm-depth-maps-20250729-deployment", 
-                    deployment, img_name.replace(".png", "_depth.npy")
+                    self.data_dir_root, dirs["DEPTH"], 
+                    deployment, base_name + files["DEPTH_SUFFIX"]
                 )
                 mask_path = os.path.join(
-                    self.data_dir_root, "binary-masks-20250729-deployment", 
-                    deployment, img_name.replace(".png", "_depth_mask.npy")
+                    self.data_dir_root, dirs["MASKS"], 
+                    deployment, base_name + files["MASK_SUFFIX"]
                 )
                 
                 # Only include if all files exist
@@ -123,61 +161,37 @@ class DIODE(Dataset):
         sample = {"image": image, "depth": depth, "valid": valid}
         return self.transform(sample)
 
-    def _debug_directory_structure(self, deployments):
-        """Debug helper to check directory structure."""
-        for deployment in deployments:
-            print(f"\nChecking {deployment}:")
-            
-            img_dir = os.path.join(self.data_dir_root, "extracted-frames-20250617", deployment)
-            depth_dir = os.path.join(self.data_dir_root, "norm-depth-maps-20250729-deployment", deployment)
-            mask_dir = os.path.join(self.data_dir_root, "binary-masks-20250729-deployment", deployment)
-            
-            print(f"  Images dir: {img_dir} (exists: {os.path.exists(img_dir)})")
-            print(f"  Depth dir: {depth_dir} (exists: {os.path.exists(depth_dir)})")
-            print(f"  Masks dir: {mask_dir} (exists: {os.path.exists(mask_dir)})")
-            
-            if os.path.exists(img_dir):
-                img_count = len(glob.glob(os.path.join(img_dir, "*.png")))
-                print(f"  Images found: {img_count}")
-                if img_count > 0:
-                    sample_img = glob.glob(os.path.join(img_dir, "*.png"))[0]
-                    img_name = os.path.basename(sample_img)
-                    expected_depth = os.path.join(depth_dir, img_name.replace(".png", "_depth.npy"))
-                    expected_mask = os.path.join(mask_dir, img_name.replace(".png", "_depth_mask.npy"))
-                    print(f"  Sample image: {img_name}")
-                    print(f"  Expected depth: {expected_depth} (exists: {os.path.exists(expected_depth)})")
-                    print(f"  Expected mask: {expected_mask} (exists: {os.path.exists(expected_mask)})")
-
     def __len__(self):
         return len(self.triplets)
 
 
-def get_diode_loader(data_dir_root, batch_size=1, num_workers=0, deployments=None, **kwargs):
+def get_diode_loader(config_path="config.yaml", **kwargs):
 
-    # Use only deployments that have data by default
-    if deployments is None:
-        deployments = ['deployment_16', 'deployment_3019']
+    config = load_config(config_path)
     
-    dataset = DIODE(data_dir_root, deployments=deployments)
-    return DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, **kwargs)
-
-
-# Test the data loader
-if __name__ == "__main__":
-    data_dir = "/mnt/d/project-monocular-data-prep/data/ground-truths/tnc"
+    # Use config defaults, allow kwargs to override
+    batch_size = kwargs.pop('batch_size', config["DATALOADER"]["BATCH_SIZE"])
+    num_workers = kwargs.pop('num_workers', config["DATALOADER"]["NUM_WORKERS"])
+    shuffle = kwargs.pop('shuffle', config["DATALOADER"]["SHUFFLE"])
     
-    try:
-        # Test with all deployments
-        # loader = get_diode_loader(data_dir, batch_size=1)
-        # print(f"Dataset loaded successfully with {len(loader.dataset)} samples")
+    dataset = DIODE(config)
+    return DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle, **kwargs)
 
-        # Use specific deployments  
-        loader = get_diode_loader(data_dir, deployments=['deployment_16', 'deployment_3019'])
-        print(f"Dataset loaded successfully with {len(loader.dataset)} samples")
+
+# # Test the data loader
+# if __name__ == "__main__":
+#     try:
+#         # All configuration comes from the YAML file
+#         loader = get_diode_loader()
+#         print(f"Dataset loaded successfully with {len(loader.dataset)} samples")
         
-        # Test loading one batch
-        batch = next(iter(loader))
-        print(f"Image: {batch['image'].shape}, Depth: {batch['depth'].shape}, Valid: {batch['valid'].shape}")
+#         # Test loading one batch
+#         batch = next(iter(loader))
+#         print(f"Image: {batch['image'].shape}, Depth: {batch['depth'].shape}, Valid: {batch['valid'].shape}")
         
-    except Exception as e:
-        print(f"Error loading dataset: {e}")
+#         # Only DataLoader-specific parameters can be overridden
+#         # loader = get_diode_loader(batch_size=2, num_workers=1)
+#         # print(f"Dataset with custom batch size: {len(loader.dataset)} samples")
+        
+#     except Exception as e:
+#         print(f"Error loading dataset: {e}")
