@@ -177,7 +177,7 @@ DATASETS_CONFIG = {
     },
     "diode_outdoor": {
         "dataset": "diode_outdoor",
-        "diode_outdoor_root": "/home/shakyafernando/projects/ZoeDepth/data/ground-truths/tnc",
+        "diode_outdoor_root": "/mnt/d/project-monocular-data-prep/data/ground-truths/tnc",
         "multigpu": False,
         "garg_crop": True,
         "do_kb_crop": False,
