@@ -187,6 +187,7 @@ DATASETS_CONFIG = {
         "dataset": "diode_outdoor",
         "diode_outdoor_root": os.path.join(config["PLATFORMS"]["WSL"]["PREFIX"], config["DIRECTORIES"]["BASE_DIR"]),
         "multigpu": False,
+        "eigen_crop": False,        
         "garg_crop": True,
         "do_kb_crop": False,
         "min_depth_eval": 1e-3,
