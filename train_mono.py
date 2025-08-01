@@ -83,6 +83,13 @@ def main_worker(gpu, ngpus_per_node, config):
         # Set the device to GPU or CPU based on availability.
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        # if torch.backends.mps.is_available():
+        #     device = torch.device("mps") # Mac
+        # elif torch.cuda.is_available():
+        #     device = torch.device("cuda")
+        # else:
+        #     device = torch.device("cpu")
+
         # Fix seed for reproducibility.
         seed = config.seed if "seed" in config and config.seed else 43
         fix_random_seed(seed)
