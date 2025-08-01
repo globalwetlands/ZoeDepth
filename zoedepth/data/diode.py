@@ -176,22 +176,3 @@ def get_diode_loader(config_path="config.yaml", **kwargs):
     
     dataset = DIODE(config)
     return DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, shuffle=shuffle, **kwargs)
-
-
-# # Test the data loader
-# if __name__ == "__main__":
-#     try:
-#         # All configuration comes from the YAML file
-#         loader = get_diode_loader()
-#         print(f"Dataset loaded successfully with {len(loader.dataset)} samples")
-        
-#         # Test loading one batch
-#         batch = next(iter(loader))
-#         print(f"Image: {batch['image'].shape}, Depth: {batch['depth'].shape}, Valid: {batch['valid'].shape}")
-        
-#         # Only DataLoader-specific parameters can be overridden
-#         # loader = get_diode_loader(batch_size=2, num_workers=1)
-#         # print(f"Dataset with custom batch size: {len(loader.dataset)} samples")
-        
-#     except Exception as e:
-#         print(f"Error loading dataset: {e}")
