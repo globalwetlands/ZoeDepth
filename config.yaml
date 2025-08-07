@@ -17,10 +17,10 @@ PLATFORMS:
 
 # DATA DIRECTORIES
 DIRECTORIES:
-  BASE_DIR: "project-monocular-data-prep/data/ground-truths/tnc"  # BASE DIR
+  BASE_DIR: "project-monocular-data-prep/data/ground-truths/tnc/copy/"  # BASE DIR
   IMAGES: "extracted-frames-20250617"                             # IMAGES DIR
-  DEPTH: "norm-depth-maps-20250729-deployment"                    # METRIC DEPTH MAPS DIR
-  MASKS: "binary-masks-20250729-deployment"                       # MASKS DIR
+  DEPTH: "norm-depth-maps-20250801"                    # METRIC DEPTH MAPS DIR
+  MASKS: "binary-masks-20250804"                       # MASKS DIR
 
 # FILE EXTENSIONS
 FILES:
